@@ -11,7 +11,7 @@ A drop-in status line for [Claude Code](https://code.claude.com) that shows, alw
 Example output:
 
 ```
-[Sonnet] 📁 orodruin-3 | 🌿 feature/onsite-nps +2 ~5
+[Sonnet] 📁 domestic-budget | 🌿 feature/start-project +2 ~5
 ██████░░░░ 62% ctx | 5h: 24% 7d: 41% quota | ⏱️ 12m 8s
 ```
 
