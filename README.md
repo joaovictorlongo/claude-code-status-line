@@ -27,9 +27,11 @@ Colors shift as usage climbs: **green** under 70%, **yellow** 70–89%, **red** 
 
 ## Automatic install (recommended)
 
-From the project directory, make the installer executable and run it:
+Run:
 
 ```bash
+git clone git@github.com:joaovictorlongo/claude-code-status-line.git
+cd claude-code-status-line
 chmod +x install-statusline.sh
 ./install-statusline.sh
 ```
