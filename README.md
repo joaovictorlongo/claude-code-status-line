@@ -4,7 +4,7 @@ A drop-in status line for [Claude Code](https://code.claude.com) that shows, alw
 
 - **Model** in use
 - **Current folder** and **git branch** (with staged `+`/modified `~` counts)
-- **Context window usage** as a color-coded progress bar
+- **Context window usage** as a color-coded progress bar, with the current token count
 - **Rate-limit quota** used (5-hour / 7-day windows)
 - **Session duration**
 
@@ -12,7 +12,7 @@ Example output:
 
 ```
 [Sonnet] 📁 domestic-budget | 🌿 feature/start-project +2 ~5
-██████░░░░ 62% ctx | 5h: 24% 7d: 41% quota | ⏱️ 12m 8s
+██████░░░░ 62% ctx (124.0k) | 5h: 24% 7d: 41% quota | ⏱️ 12m 8s
 ```
 
 Colors shift as usage climbs: **green** under 70%, **yellow** 70–89%, **red** 90%+ — for both the context bar and the quota text.
@@ -48,6 +48,27 @@ The script may ask for your password through `sudo` when installing `jq` on Linu
 Once it finishes, open or restart Claude Code. If the status line does not appear, make sure you have accepted the workspace trust prompt for the folder.
 
 > **Windows:** run the installer from Git Bash. Without Git Bash, use the [PowerShell alternative](https://code.claude.com/docs/en/statusline#windows-configuration) from Anthropic's documentation.
+
+## Update
+
+If you cloned the repository with Git, enter the project directory, download the latest changes, and run the installer again:
+
+```bash
+cd claude-code-status-line
+git pull
+./install-statusline.sh
+```
+
+If you downloaded the files manually, download the latest `install-statusline.sh`, replace your local copy, and run:
+
+```bash
+chmod +x install-statusline.sh
+./install-statusline.sh
+```
+
+Running the installer again updates `~/.claude/statusline.sh` and preserves your other Claude Code settings. Before replacing existing files, it creates timestamped backups such as `statusline.sh.bak.YYYYMMDDHHMMSS` and `settings.json.bak.YYYYMMDDHHMMSS` inside `~/.claude`.
+
+Open or restart Claude Code after updating to load the latest status line.
 
 ## Manual install
 
@@ -98,6 +119,12 @@ MODEL=$(echo "$input" | jq -r '.model.display_name')
 DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
 PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+TOKENS=$(echo "$input" | jq -r '
+  .context_window.total_input_tokens //
+  ((.context_window.current_usage.input_tokens // 0) +
+   (.context_window.current_usage.cache_creation_input_tokens // 0) +
+   (.context_window.current_usage.cache_read_input_tokens // 0))
+')
 FIVE_H=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 WEEK=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
 
@@ -106,6 +133,13 @@ GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
 RESET='\033[0m'
+
+# Compact token count: 46600 -> 46.6k
+TOKENS_DISPLAY=$(awk -v tokens="$TOKENS" 'BEGIN {
+  if (tokens >= 1000000) printf "%.1fM", tokens / 1000000
+  else if (tokens >= 1000) printf "%.1fk", tokens / 1000
+  else printf "%d", tokens
+}')
 
 # Color the context bar based on how full it is
 if [ "$PCT" -ge 90 ]; then
@@ -146,10 +180,17 @@ else
   QUOTA_COLOR="$GREEN"
 fi
 
-# Duration as Xm Ys
+# Duration as Xm Ys, or Xh Ym after one hour
 DURATION_SEC=$((DURATION_MS / 1000))
 MINS=$((DURATION_SEC / 60))
 SECS=$((DURATION_SEC % 60))
+if [ "$MINS" -ge 60 ]; then
+  HOURS=$((MINS / 60))
+  REMAINING_MINS=$((MINS % 60))
+  DURATION="${HOURS}h ${REMAINING_MINS}m"
+else
+  DURATION="${MINS}m ${SECS}s"
+fi
 
 # Git branch + dirty state (skips cleanly if not a git repo)
 BRANCH=""
@@ -166,7 +207,7 @@ fi
 # Line 1: model, folder, git info
 echo -e "${CYAN}[$MODEL]${RESET} 📁 ${DIR##*/}${BRANCH}"
 # Line 2: context bar, quota, duration
-echo -e "${BAR_COLOR}${BAR}${RESET} ${PCT}% ctx | ${QUOTA_COLOR}${QUOTA}${RESET} quota | ⏱️ ${MINS}m ${SECS}s"
+echo -e "${BAR_COLOR}${BAR}${RESET} ${PCT}% ctx (${TOKENS_DISPLAY}) | ${QUOTA_COLOR}${QUOTA}${RESET} quota | ⏱️ ${DURATION}"
 ```
 
 ## Notes
