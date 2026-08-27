@@ -2,7 +2,7 @@
 
 A drop-in status line for [Claude Code](https://code.claude.com) that shows, always visible at the bottom of your terminal:
 
-- **Model** in use
+- **Model** and **reasoning effort** in use (when supported)
 - **Current folder** and **git branch** (with staged `+`/modified `~` counts)
 - **Context window usage** as a color-coded progress bar, with the current token count
 - **Rate-limit quota** used (5-hour / 7-day windows)
@@ -11,7 +11,7 @@ A drop-in status line for [Claude Code](https://code.claude.com) that shows, alw
 Example output:
 
 ```
-[Sonnet] 📁 domestic-budget | 🌿 feature/start-project +2 ~5
+[Sonnet · high] 📁 domestic-budget | 🌿 feature/start-project +2 ~5
 ██████░░░░ 62% ctx (124.0k) | 5h: 24% 7d: 41% quota | ⏱️ 12m 8s
 ```
 
@@ -95,7 +95,7 @@ That's it. No restart of your shell needed, and it doesn't consume any API token
 ```bash
 #!/bin/bash
 # Claude Code custom status line
-# Shows: model | dir | git branch+status | context usage bar | rate-limit quota | duration
+# Shows: model+effort | dir | git branch+status | context usage bar | rate-limit quota | duration
 #
 # Note: rate_limits (5h/7d quota) is only sent for Claude.ai Pro/Max
 # subscribers, and only after the first API response in the session.
@@ -116,6 +116,7 @@ That's it. No restart of your shell needed, and it doesn't consume any API token
 input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name')
+EFFORT=$(echo "$input" | jq -r '.effort.level // empty')
 DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
 PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
@@ -204,8 +205,10 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
   BRANCH=" | 🌿 ${BRANCH_NAME} ${GIT_STATUS}"
 fi
 
-# Line 1: model, folder, git info
-echo -e "${CYAN}[$MODEL]${RESET} 📁 ${DIR##*/}${BRANCH}"
+# Line 1: model, effort (when supported), folder, git info
+MODEL_DISPLAY="$MODEL"
+[ -n "$EFFORT" ] && MODEL_DISPLAY="$MODEL · $EFFORT"
+echo -e "${CYAN}[$MODEL_DISPLAY]${RESET} 📁 ${DIR##*/}${BRANCH}"
 # Line 2: context bar, quota, duration
 echo -e "${BAR_COLOR}${BAR}${RESET} ${PCT}% ctx (${TOKENS_DISPLAY}) | ${QUOTA_COLOR}${QUOTA}${RESET} quota | ⏱️ ${DURATION}"
 ```
@@ -213,6 +216,7 @@ echo -e "${BAR_COLOR}${BAR}${RESET} ${PCT}% ctx (${TOKENS_DISPLAY}) | ${QUOTA_CO
 ## Notes
 
 - **Quota (`5h`/`7d`) only shows for Claude.ai Pro/Max subscriptions.** On API or console billing, that field isn't sent, and the script prints `n/a` instead of breaking.
+- **Effort only appears for models that support it.** The status line follows live changes made with `/effort` during the session.
 - The script runs locally on your machine and doesn't cost API tokens.
 - It updates automatically whenever a new message arrives, after `/compact`, or when the permission mode changes.
 - To customize further, ask Claude Code directly: `/statusline show <what you want>` will generate/adjust a script for you interactively.
