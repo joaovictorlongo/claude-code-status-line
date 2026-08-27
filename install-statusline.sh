@@ -62,7 +62,7 @@ fi
 cat > "$STATUSLINE_PATH" << 'STATUSLINE_EOF'
 #!/bin/bash
 # Claude Code custom status line
-# Shows: model | dir | git branch+status | context usage bar | rate-limit quota | duration
+# Shows: model+effort | dir | git branch+status | context usage bar | rate-limit quota | duration
 #
 # Note: rate_limits (5h/7d quota) is only sent for Claude.ai Pro/Max
 # subscribers, and only after the first API response in the session.
@@ -72,6 +72,7 @@ cat > "$STATUSLINE_PATH" << 'STATUSLINE_EOF'
 input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name')
+EFFORT=$(echo "$input" | jq -r '.effort.level // empty')
 DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
 PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
@@ -160,8 +161,10 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
   BRANCH=" | 🌿 ${BRANCH_NAME} ${GIT_STATUS}"
 fi
 
-# Line 1: model, folder, git info
-echo -e "${CYAN}[$MODEL]${RESET} 📁 ${DIR##*/}${BRANCH}"
+# Line 1: model, effort (when supported), folder, git info
+MODEL_DISPLAY="$MODEL"
+[ -n "$EFFORT" ] && MODEL_DISPLAY="$MODEL · $EFFORT"
+echo -e "${CYAN}[$MODEL_DISPLAY]${RESET} 📁 ${DIR##*/}${BRANCH}"
 # Line 2: context bar, quota, duration
 echo -e "${BAR_COLOR}${BAR}${RESET} ${PCT}% ctx (${TOKENS_DISPLAY}) | ${QUOTA_COLOR}${QUOTA}${RESET} quota | ⏱️ ${DURATION}"
 STATUSLINE_EOF
